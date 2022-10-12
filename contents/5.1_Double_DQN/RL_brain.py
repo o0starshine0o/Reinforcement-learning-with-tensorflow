@@ -9,7 +9,9 @@ gym: 0.8.0
 """
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 np.random.seed(1)
 tf.set_random_seed(1)

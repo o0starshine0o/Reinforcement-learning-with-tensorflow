@@ -22,7 +22,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
     * [Q-learning](contents/2_Q_Learning_maze)
     * [Sarsa](contents/3_Sarsa_maze)
     * [Sarsa(lambda)](contents/4_Sarsa_lambda_maze)
-    * [Deep Q Network (DQN)](contents/5_Deep_Q_Network)
+    * [Deep Q Network (DQN)](contents/5.0_Deep_Q_Network)
     * [Using OpenAI Gym](contents/6_OpenAI_gym)
     * [Double DQN](contents/5.1_Double_DQN)
     * [DQN with Prioitized Experience Replay](contents/5.2_Prioritized_Replay_DQN)
@@ -41,9 +41,9 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
     * [LunarLander](experiments/Solve_LunarLander)
 
 # Some RL Networks
-### [Deep Q Network](contents/5_Deep_Q_Network)
+### [Deep Q Network](contents/5.0_Deep_Q_Network)
 
-<a href="contents/5_Deep_Q_Network">
+<a href="contents/5.0_Deep_Q_Network">
     <img class="course-image" src="https://mofanpy.com/static/results/reinforcement-learning/4-3-2.png">
 </a>
 

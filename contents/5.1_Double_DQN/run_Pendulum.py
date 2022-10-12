@@ -11,15 +11,18 @@ gym: 0.8.0
 
 
 import gym
+from gym.utils import seeding
 from RL_brain import DoubleDQN
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 
-env = gym.make('Pendulum-v0')
+env = gym.make('Pendulum-v1')
 env = env.unwrapped
-env.seed(1)
+env.np_random, seed = seeding.np_random(1)
 MEMORY_SIZE = 3000
 ACTION_SPACE = 11
 
