@@ -10,10 +10,13 @@ tensorflow 1.0
 gym 0.8.0
 """
 
-import tensorflow as tf
 import numpy as np
 import gym
+from gym.utils import seeding
 import time
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 
 #####################  hyper parameters  ####################
@@ -28,7 +31,7 @@ MEMORY_CAPACITY = 10000
 BATCH_SIZE = 32
 
 RENDER = False
-ENV_NAME = 'Pendulum-v0'
+ENV_NAME = 'Pendulum-v1'
 
 ###############################  DDPG  ####################################
 
@@ -112,9 +115,9 @@ class DDPG(object):
 
 ###############################  training  ####################################
 
-env = gym.make(ENV_NAME)
+env = gym.make(ENV_NAME, render_mode='rgb_array')
 env = env.unwrapped
-env.seed(1)
+env.np_random, seed = seeding.np_random(1)  # reproducible
 
 s_dim = env.observation_space.shape[0]
 a_dim = env.action_space.shape[0]
@@ -125,16 +128,16 @@ ddpg = DDPG(a_dim, s_dim, a_bound)
 var = 3  # control exploration
 t1 = time.time()
 for i in range(MAX_EPISODES):
-    s = env.reset()
+    s, _ = env.reset()
     ep_reward = 0
     for j in range(MAX_EP_STEPS):
         if RENDER:
-            env.render()
+            env.render_mode = 'human'
 
         # Add exploration noise
         a = ddpg.choose_action(s)
         a = np.clip(np.random.normal(a, var), -2, 2)    # add randomness to action selection for exploration
-        s_, r, done, info = env.step(a)
+        s_, r, done, _, info = env.step(a)
 
         ddpg.store_transition(s, a, r / 10, s_)
 
@@ -146,6 +149,6 @@ for i in range(MAX_EPISODES):
         ep_reward += r
         if j == MAX_EP_STEPS-1:
             print('Episode:', i, ' Reward: %i' % int(ep_reward), 'Explore: %.2f' % var, )
-            # if ep_reward > -300:RENDER = True
+            if ep_reward > -300:RENDER = True
             break
 print('Running time: ', time.time() - t1)

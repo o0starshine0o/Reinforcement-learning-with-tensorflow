@@ -10,10 +10,13 @@ tensorflow 1.0
 gym 0.8.0
 """
 
-import tensorflow as tf
 import numpy as np
 import gym
+from gym.utils import seeding
 import time
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 
 np.random.seed(1)
@@ -35,7 +38,7 @@ BATCH_SIZE = 32
 
 RENDER = False
 OUTPUT_GRAPH = True
-ENV_NAME = 'Pendulum-v0'
+ENV_NAME = 'Pendulum-v1'
 
 ###############################  Actor  ####################################
 
@@ -193,9 +196,9 @@ class Memory(object):
         return self.data[indices, :]
 
 
-env = gym.make(ENV_NAME)
+env = gym.make(ENV_NAME, render_mode='rgb_array')
 env = env.unwrapped
-env.seed(1)
+env.np_random, seed = seeding.np_random(1)  # reproducible
 
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
@@ -229,18 +232,18 @@ var = 3  # control exploration
 
 t1 = time.time()
 for i in range(MAX_EPISODES):
-    s = env.reset()
+    s, _ = env.reset()
     ep_reward = 0
 
     for j in range(MAX_EP_STEPS):
 
         if RENDER:
-            env.render()
+            env.render_mode = 'human'
 
         # Add exploration noise
         a = actor.choose_action(s)
         a = np.clip(np.random.normal(a, var), -2, 2)    # add randomness to action selection for exploration
-        s_, r, done, info = env.step(a)
+        s_, r, done, _, info = env.step(a)
 
         M.store_transition(s, a, r / 10, s_)
 
