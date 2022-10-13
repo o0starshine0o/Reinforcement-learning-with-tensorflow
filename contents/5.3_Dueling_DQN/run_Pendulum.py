@@ -10,15 +10,18 @@ gym: 0.8.0
 
 
 import gym
+from gym.utils import seeding
 from RL_brain import DuelingDQN
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 
-env = gym.make('Pendulum-v0')
+env = gym.make('Pendulum-v1', render_mode='rgb_array')
 env = env.unwrapped
-env.seed(1)
+env.np_random, seed = seeding.np_random(1)
 MEMORY_SIZE = 3000
 ACTION_SPACE = 25
 
@@ -39,14 +42,15 @@ sess.run(tf.global_variables_initializer())
 def train(RL):
     acc_r = [0]
     total_steps = 0
-    observation = env.reset()
+    observation, _ = env.reset()
     while True:
-        # if total_steps-MEMORY_SIZE > 9000: env.render()
+        if total_steps - MEMORY_SIZE > 15000:
+            env.render_mode = 'human'
 
         action = RL.choose_action(observation)
 
         f_action = (action-(ACTION_SPACE-1)/2)/((ACTION_SPACE-1)/4)   # [-2 ~ 2] float actions
-        observation_, reward, done, info = env.step(np.array([f_action]))
+        observation_, reward, done, _, info = env.step(np.array([f_action]))
 
         reward /= 10      # normalize to a range of (-1, 0)
         acc_r.append(reward + acc_r[-1])  # accumulated reward

@@ -10,14 +10,17 @@ gym: 0.8.0
 
 
 import gym
+from gym.utils import seeding
 from RL_brain import DQNPrioritizedReplay
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import numpy as np
+import tensorflow.compat.v1 as tf
 
-env = gym.make('MountainCar-v0')
+tf.disable_v2_behavior()
+
+env = gym.make('MountainCar-v0', render_mode='rgb_array')
 env = env.unwrapped
-env.seed(21)
+env.np_random, seed = seeding.np_random(1)
 MEMORY_SIZE = 10000
 
 sess = tf.Session()
@@ -40,13 +43,14 @@ def train(RL):
     steps = []
     episodes = []
     for i_episode in range(20):
-        observation = env.reset()
+        observation, _ = env.reset()
         while True:
-            # env.render()
+            if total_steps - MEMORY_SIZE > 30000:
+                env.render_mode = 'human'
 
             action = RL.choose_action(observation)
 
-            observation_, reward, done, info = env.step(action)
+            observation_, reward, done, _, info = env.step(action)
 
             if done: reward = 10
 
