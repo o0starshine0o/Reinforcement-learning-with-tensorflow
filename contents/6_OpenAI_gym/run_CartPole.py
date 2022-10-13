@@ -29,14 +29,14 @@ total_steps = 0
 
 for i_episode in range(100):
 
-    observation = env.reset()
+    observation, env_info = env.reset()
     ep_r = 0
     while True:
         env.render()
 
         action = RL.choose_action(observation)
 
-        observation_, reward, done, info = env.step(action)
+        observation_, reward, done, truncated, info = env.step(action)
 
         # the smaller theta and closer to center the better
         x, x_dot, theta, theta_dot = observation_
