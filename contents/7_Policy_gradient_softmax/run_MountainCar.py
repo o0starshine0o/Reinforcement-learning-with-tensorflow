@@ -11,6 +11,7 @@ gym: 0.8.0
 """
 
 import gym
+from gym.utils import seeding
 from RL_brain import PolicyGradient
 import matplotlib.pyplot as plt
 
@@ -22,8 +23,8 @@ DISPLAY_REWARD_THRESHOLD = -2000  # renders environment if total episode reward 
 
 RENDER = False  # rendering wastes time
 
-env = gym.make('MountainCar-v0')
-env.seed(1)     # reproducible, general Policy gradient has high variance
+env = gym.make('MountainCar-v0', render_mode='rgb_array')
+env.np_random, seed = seeding.np_random(1)     # reproducible, general Policy gradient has high variance
 env = env.unwrapped
 
 print(env.action_space)
@@ -41,14 +42,15 @@ RL = PolicyGradient(
 
 for i_episode in range(1000):
 
-    observation = env.reset()
+    observation, _ = env.reset()
 
     while True:
-        if RENDER: env.render()
+        if RENDER:
+            env.render_mode = 'human'
 
         action = RL.choose_action(observation)
 
-        observation_, reward, done, info = env.step(action)     # reward = -1 in all cases
+        observation_, reward, done, _, info = env.step(action)     # reward = -1 in all cases
 
         RL.store_transition(observation, action, reward)
 

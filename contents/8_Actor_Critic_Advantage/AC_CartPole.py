@@ -11,8 +11,11 @@ gym 0.8.0
 """
 
 import numpy as np
-import tensorflow as tf
 import gym
+from gym.utils import seeding
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 np.random.seed(2)
 tf.set_random_seed(2)  # reproducible
@@ -27,8 +30,8 @@ GAMMA = 0.9     # reward discount in TD error
 LR_A = 0.001    # learning rate for actor
 LR_C = 0.01     # learning rate for critic
 
-env = gym.make('CartPole-v0')
-env.seed(1)  # reproducible
+env = gym.make('CartPole-v0', render_mode='rgb_array')
+env.np_random, seed = seeding.np_random(1)  # reproducible
 env = env.unwrapped
 
 N_F = env.observation_space.shape[0]
@@ -136,15 +139,16 @@ if OUTPUT_GRAPH:
     tf.summary.FileWriter("logs/", sess.graph)
 
 for i_episode in range(MAX_EPISODE):
-    s = env.reset()
+    s, _ = env.reset()
     t = 0
     track_r = []
     while True:
-        if RENDER: env.render()
+        if RENDER:
+            env.render_mode = 'human'
 
         a = actor.choose_action(s)
 
-        s_, r, done, info = env.step(a)
+        s_, r, done, _, info = env.step(a)
 
         if done: r = -20
 
