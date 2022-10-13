@@ -10,7 +10,7 @@ gym: 0.8.0
 import gym
 from RL_brain import DeepQNetwork
 
-env = gym.make('MountainCar-v0')
+env = gym.make('MountainCar-v0', render_mode="rgb_array")
 env = env.unwrapped
 
 print(env.action_space)
@@ -27,14 +27,14 @@ total_steps = 0
 
 for i_episode in range(10):
 
-    observation = env.reset()
+    observation, env_info = env.reset()
     ep_r = 0
     while True:
         env.render()
 
         action = RL.choose_action(observation)
 
-        observation_, reward, done, info = env.step(action)
+        observation_, reward, done, truncated, info = env.step(action)
 
         position, velocity = observation_
 

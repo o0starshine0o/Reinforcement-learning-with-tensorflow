@@ -10,7 +10,7 @@ gym: 0.7.3
 import gym
 from RL_brain import DeepQNetwork
 
-env = gym.make('CartPole-v0')
+env = gym.make('CartPole-v0', render_mode="human")
 env = env.unwrapped
 
 print(env.action_space)
