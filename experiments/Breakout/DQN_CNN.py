@@ -590,7 +590,7 @@ if __name__ == "__main__":
                         action = agent.get_action(frame_number, game_wrapper.state)
 
                         # Take step
-                        processed_frame, reward, terminal, life_lost, render_frame = game_wrapper.step(action, 'human')
+                        processed_frame, reward, terminal, life_lost = game_wrapper.step(action)
                         frame_number += 1
                         epoch_frame += 1
                         episode_reward_sum += reward
@@ -645,7 +645,7 @@ if __name__ == "__main__":
                     action = 1 if life_lost else agent.get_action(frame_number, game_wrapper.state, evaluation=True)
 
                     # Step action
-                    _, reward, terminal, life_lost, render_frame = game_wrapper.step(action, 'human')
+                    _, reward, terminal, life_lost = game_wrapper.step(action)
                     evaluate_frame_number += 1
                     episode_reward_sum += reward
 

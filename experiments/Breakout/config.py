@@ -1,7 +1,7 @@
 ### The Config ###
 
 # Name of the Gym environment for the agent to learn & play
-ENV_NAME = 'BreakoutDeterministic-v4'
+ENV_NAME = 'ALE/Breakout-v5'
 
 # Loading and saving information.
 # If LOAD_FROM is None, it will train a new agent.
