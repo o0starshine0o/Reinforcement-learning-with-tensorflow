@@ -12,14 +12,16 @@ gym 0.10.5
 
 import multiprocessing
 import threading
-import tensorflow as tf
 import numpy as np
 import gym
 import os
 import shutil
 import matplotlib.pyplot as plt
+import tensorflow.compat.v1 as tf
 
-GAME = 'Pendulum-v0'
+tf.disable_v2_behavior()
+
+GAME = 'Pendulum-v1'
 OUTPUT_GRAPH = True
 LOG_DIR = './log'
 N_WORKERS = multiprocessing.cpu_count()
@@ -34,7 +36,7 @@ LR_C = 0.001    # learning rate for critic
 GLOBAL_RUNNING_R = []
 GLOBAL_EP = 0
 
-env = gym.make(GAME)
+env = gym.make(GAME, render_mode='rgb_array')
 
 N_S = env.observation_space.shape[0]
 N_A = env.action_space.shape[0]
@@ -121,13 +123,13 @@ class Worker(object):
         total_step = 1
         buffer_s, buffer_a, buffer_r = [], [], []
         while not COORD.should_stop() and GLOBAL_EP < MAX_GLOBAL_EP:
-            s = self.env.reset()
+            s, _ = self.env.reset()
             ep_r = 0
             for ep_t in range(MAX_EP_STEP):
                 # if self.name == 'W_0':
-                #     self.env.render()
+                #     self.env.render_mode = 'human'
                 a = self.AC.choose_action(s)
-                s_, r, done, info = self.env.step(a)
+                s_, r, done, _, info = self.env.step(a)
                 done = True if ep_t == MAX_EP_STEP - 1 else False
 
                 ep_r += r
