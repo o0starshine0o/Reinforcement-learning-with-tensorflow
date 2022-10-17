@@ -122,7 +122,7 @@ class GameWrapper:
         # evaluation is slightly different.
         if evaluation:
             for _ in range(random.randint(0, self.no_op_steps)):
-                self.env.step(1)
+                self.env.step(0)
 
         # For the initial state, we stack the first frame four times
         self.state = np.repeat(process_frame(self.frame), self.history_length, axis=2)
@@ -161,7 +161,7 @@ class GameWrapper:
         processed_frame = process_frame(new_frame)
         self.state = np.append(self.state[:, :, 1:], processed_frame, axis=2)
 
-        return processed_frame, reward, terminal, life_lost, self.env.render()
+        return processed_frame, reward, terminal, life_lost
 
 
 class ReplayBuffer:
@@ -395,7 +395,7 @@ class Agent(object):
         """Query the DQN for an action given a state
         Arguments:
             frame_number: Global frame number (used for epsilon)
-            state: State to give an action for
+            state: State to give an action for, (84, 84, 4) , (宽, 高, 连续n帧)
             evaluation: True if the model is evaluating,
                 False otherwise (uses eps_evaluation instead of default epsilon value)
         Returns:
@@ -403,15 +403,19 @@ class Agent(object):
         """
 
         # Calculate epsilon based on the frame number
-        eps = self.calc_epsilon(frame_number, evaluation)
+        epsilon = self.calc_epsilon(frame_number, evaluation)
 
         # With chance epsilon, take a random action
-        if np.random.rand(1) < eps:
+        if np.random.rand(1) < epsilon:
             return np.random.randint(0, self.n_actions)
 
         # Otherwise, query the DQN for an action
-        q_vals = self.DQN.predict(state.reshape((-1, self.input_shape[0], self.input_shape[1], self.history_length)))[0]
-        return q_vals.argmax()
+        # 需要把state转换成DQN能够接受的shape
+        state = state.reshape((-1, self.input_shape[0], self.input_shape[1], self.history_length))
+        # DQN返回的是(1, 4)形式,第二维数组代表了每个动作的执行概率
+        action_probabilities = self.DQN.predict(state)[0]
+        # 返回概率最大的那个动作索引
+        return action_probabilities.argmax()
 
     def get_intermediate_representation(self, state, layer_names=None, stack_state=True):
         """
@@ -610,7 +614,7 @@ if __name__ == "__main__":
                         action = agent.get_action(frame_number, game_wrapper.state)
 
                         # Take step
-                        processed_frame, reward, terminal, life_lost = game_wrapper.step(action)
+                        processed_frame, reward, terminal, life_lost = game_wrapper.step(action, 'human')
                         frame_number += 1
                         epoch_frame += 1
                         episode_reward_sum += reward
