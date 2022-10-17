@@ -1,27 +1,24 @@
-from config import (BATCH_SIZE, CLIP_REWARD, DISCOUNT_FACTOR, ENV_NAME,
-                    EVAL_LENGTH, FRAMES_BETWEEN_EVAL, INPUT_SHAPE,
-                    LEARNING_RATE, LOAD_FROM, LOAD_REPLAY_BUFFER,
-                    MAX_EPISODE_LENGTH, MAX_NOOP_STEPS, MEM_SIZE,
-                    MIN_REPLAY_BUFFER_SIZE, PRIORITY_SCALE, SAVE_PATH,
-                    TENSORBOARD_DIR, TOTAL_FRAMES, UPDATE_FREQ, USE_PER,
-                    WRITE_TENSORBOARD)
-
-import numpy as np
-import cv2
-
-import random
-import os
 import json
+import os
+import random
 import time
 
+import cv2
 import gym
-
+import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras.initializers.initializers_v2 import VarianceScaling
 from tensorflow.python.keras.layers import Add, Conv2D, Dense, Flatten, Input, Lambda, Subtract
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.optimizer_v2.adam import Adam
-from tensorflow.python.keras.optimizer_v2.rmsprop import RMSprop
+
+from config import (BATCH_SIZE, CLIP_REWARD, DISCOUNT_FACTOR, ENV_NAME,
+                    EVAL_LENGTH, FRAMES_BETWEEN_EVAL, INPUT_SHAPE,
+                    LEARNING_RATE, LOAD_FROM, LOAD_REPLAY_BUFFER,
+                    MAX_EPISODE_LENGTH, MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE,
+                    MIN_REPLAY_BUFFER_SIZE, PRIORITY_SCALE, SAVE_PATH,
+                    TENSORBOARD_DIR, TOTAL_FRAMES, UPDATE_FREQ, USE_PER,
+                    WRITE_TENSORBOARD)
 
 
 # This function can resize to any shape, but was built to resize to 84x84
@@ -38,7 +35,7 @@ def process_frame(frame, shape=INPUT_SHAPE):
     # (210, 160)
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     # (160, 160), 不明白这里为什么要用34来裁剪图片
-    frame = frame[34:34+160, :160]  # crop image
+    frame = frame[34:34 + 160, :160]  # crop image
     # (84, 84)
     frame = cv2.resize(frame, shape, interpolation=cv2.INTER_NEAREST)
     # (84, 84, 1)
@@ -101,8 +98,9 @@ def build_q_network(n_actions, learning_rate=0.00001, input_shape=INPUT_SHAPE, h
 
 class GameWrapper:
     """Wrapper for the environment provided by Gym"""
+
     def __init__(self, env_name, no_op_steps=10, history_length=4):
-        self.env = gym.make(env_name, render_mode='rgb_array').unwrapped
+        self.env = gym.make(env_name, render_mode='human').unwrapped
         self.no_op_steps = no_op_steps
         self.history_length = history_length
 
@@ -170,7 +168,8 @@ class ReplayBuffer:
     """Replay Buffer to store transitions.
     This implementation was heavily inspired by Fabio M. Graetz's replay buffer
     here: https://github.com/fg91/Deep-Q-Learning/blob/master/DQN.ipynb"""
-    def __init__(self, size=1000000, input_shape=(84, 84), history_length=4, use_per=True):
+
+    def __init__(self, size=1000000, input_shape=INPUT_SHAPE, history_length=4, use_per=True):
         """
         Arguments:
             size: Integer, Number of stored transitions
@@ -214,7 +213,7 @@ class ReplayBuffer:
         self.rewards[self.current] = reward
         self.terminal_flags[self.current] = terminal
         self.priorities[self.current] = max(self.priorities.max(), 1)  # make the most recent experience important
-        self.count = max(self.count, self.current+1)
+        self.count = max(self.count, self.current + 1)
         self.current = (self.current + 1) % self.size
 
     def get_minibatch(self, batch_size=32, priority_scale=0.0):
@@ -234,7 +233,7 @@ class ReplayBuffer:
 
         # Get sampling probabilities from priority list
         if self.use_per:
-            scaled_priorities = self.priorities[self.history_length:self.count-1] ** priority_scale
+            scaled_priorities = self.priorities[self.history_length:self.count - 1] ** priority_scale
             sample_probabilities = scaled_priorities / sum(scaled_priorities)
 
         # Get a list of valid indices
@@ -243,7 +242,7 @@ class ReplayBuffer:
             while True:
                 # Get a random number from history_length to maximum frame written with probabilities based on priority weights
                 if self.use_per:
-                    index = np.random.choice(np.arange(self.history_length, self.count-1), p=sample_probabilities)
+                    index = np.random.choice(np.arange(self.history_length, self.count - 1), p=sample_probabilities)
                 else:
                     index = random.randint(self.history_length, self.count - 1)
 
@@ -259,18 +258,19 @@ class ReplayBuffer:
         states = []
         new_states = []
         for idx in indices:
-            states.append(self.frames[idx-self.history_length:idx, ...])
-            new_states.append(self.frames[idx-self.history_length+1:idx+1, ...])
+            states.append(self.frames[idx - self.history_length:idx, ...])
+            new_states.append(self.frames[idx - self.history_length + 1:idx + 1, ...])
 
         states = np.transpose(np.asarray(states), axes=(0, 2, 3, 1))
         new_states = np.transpose(np.asarray(new_states), axes=(0, 2, 3, 1))
 
         if self.use_per:
             # Get importance weights from probabilities calculated earlier
-            importance = 1/self.count * 1/sample_probabilities[[index - self.history_length for index in indices]]
+            importance = 1 / self.count * 1 / sample_probabilities[[index - self.history_length for index in indices]]
             importance = importance / importance.max()
 
-            return (states, self.actions[indices], self.rewards[indices], new_states, self.terminal_flags[indices]), importance, indices
+            return (states, self.actions[indices], self.rewards[indices], new_states,
+                    self.terminal_flags[indices]), importance, indices
         else:
             return states, self.actions[indices], self.rewards[indices], new_states, self.terminal_flags[indices]
 
@@ -304,12 +304,13 @@ class ReplayBuffer:
 
 class Agent(object):
     """Implements a standard DDDQN agent"""
+
     def __init__(self,
                  dqn,
                  target_dqn,
                  replay_buffer,
                  n_actions,
-                 input_shape=(84, 84),
+                 input_shape=INPUT_SHAPE,
                  batch_size=32,
                  history_length=4,
                  eps_initial=1,
@@ -361,9 +362,10 @@ class Agent(object):
         # Slopes and intercepts for exploration decrease
         # (Credit to Fabio M. Graetz for this and calculating epsilon based on frame number)
         self.slope = -(self.eps_initial - self.eps_final) / self.eps_annealing_frames
-        self.intercept = self.eps_initial - self.slope*self.replay_buffer_start_size
-        self.slope_2 = -(self.eps_final - self.eps_final_frame) / (self.max_frames - self.eps_annealing_frames - self.replay_buffer_start_size)
-        self.intercept_2 = self.eps_final_frame - self.slope_2*self.max_frames
+        self.intercept = self.eps_initial - self.slope * self.replay_buffer_start_size
+        self.slope_2 = -(self.eps_final - self.eps_final_frame) / (
+                    self.max_frames - self.eps_annealing_frames - self.replay_buffer_start_size)
+        self.intercept_2 = self.eps_final_frame - self.slope_2 * self.max_frames
 
         # DQN
         self.DQN = dqn
@@ -373,7 +375,8 @@ class Agent(object):
         """Get the appropriate epsilon value from a given frame number
         Arguments:
             frame_number: Global frame number (used for epsilon)
-            evaluation: True if the model is evaluating, False otherwise (uses eps_evaluation instead of default epsilon value)
+            evaluation: True if the model is evaluating,
+                False otherwise (uses eps_evaluation instead of default epsilon value)
         Returns:
             The appropriate epsilon value
         """
@@ -381,17 +384,20 @@ class Agent(object):
             return self.eps_evaluation
         elif frame_number < self.replay_buffer_start_size:
             return self.eps_initial
-        elif frame_number >= self.replay_buffer_start_size and frame_number < self.replay_buffer_start_size + self.eps_annealing_frames:
-            return self.slope*frame_number + self.intercept
-        elif frame_number >= self.replay_buffer_start_size + self.eps_annealing_frames:
-            return self.slope_2*frame_number + self.intercept_2
+        else:
+            limit = self.replay_buffer_start_size + self.eps_annealing_frames
+            if frame_number < limit:
+                return self.slope * frame_number + self.intercept
+            else:
+                return self.slope_2 * frame_number + self.intercept_2
 
     def get_action(self, frame_number, state, evaluation=False):
         """Query the DQN for an action given a state
         Arguments:
             frame_number: Global frame number (used for epsilon)
             state: State to give an action for
-            evaluation: True if the model is evaluating, False otherwise (uses eps_evaluation instead of default epsilon value)
+            evaluation: True if the model is evaluating,
+                False otherwise (uses eps_evaluation instead of default epsilon value)
         Returns:
             An integer as the predicted move
         """
@@ -455,10 +461,13 @@ class Agent(object):
         """
 
         if self.use_per:
-            (states, actions, rewards, new_states, terminal_flags), importance, indices = self.replay_buffer.get_minibatch(batch_size=self.batch_size, priority_scale=priority_scale)
-            importance = importance ** (1-self.calc_epsilon(frame_number))
+            (states, actions, rewards, new_states,
+             terminal_flags), importance, indices = self.replay_buffer.get_minibatch(batch_size=self.batch_size,
+                                                                                     priority_scale=priority_scale)
+            importance = importance ** (1 - self.calc_epsilon(frame_number))
         else:
-            states, actions, rewards, new_states, terminal_flags = self.replay_buffer.get_minibatch(batch_size=self.batch_size, priority_scale=priority_scale)
+            states, actions, rewards, new_states, terminal_flags = self.replay_buffer.get_minibatch(
+                batch_size=self.batch_size, priority_scale=priority_scale)
 
         # Main DQN estimates best action in new states
         arg_q_max = self.DQN.predict(new_states).argmax(axis=1)
@@ -468,13 +477,14 @@ class Agent(object):
         double_q = future_q_vals[range(batch_size), arg_q_max]
 
         # Calculate targets (bellman equation)
-        target_q = rewards + (gamma*double_q * (1-terminal_flags))
+        target_q = rewards + (gamma * double_q * (1 - terminal_flags))
 
         # Use targets to calculate loss (and use loss to calculate gradients)
         with tf.GradientTape() as tape:
             q_values = self.DQN(states)
 
-            one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions, dtype=np.float32)  # using tf.one_hot causes strange errors
+            one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions,
+                                                            dtype=np.float32)  # using tf.one_hot causes strange errors
             Q = tf.reduce_sum(tf.multiply(q_values, one_hot_actions), axis=1)
 
             error = Q - target_q
@@ -514,12 +524,14 @@ class Agent(object):
 
         # Save meta
         with open(folder_name + '/meta.json', 'w+') as f:
-            f.write(json.dumps({**{'buff_count': self.replay_buffer.count, 'buff_curr': self.replay_buffer.current}, **kwargs}))  # save replay_buffer information and any other information
+            f.write(json.dumps({**{'buff_count': self.replay_buffer.count, 'buff_curr': self.replay_buffer.current},
+                                **kwargs}))  # save replay_buffer information and any other information
 
     def load(self, folder_name, load_replay_buffer=True):
         """Load a previously saved Agent from a folder
         Arguments:
             folder_name: Folder from which to load the Agent
+            load_replay_buffer: 是否同时也加载经验回放
         Returns:
             All other saved attributes, e.g., frame number
         """
@@ -530,7 +542,6 @@ class Agent(object):
         # Load DQNs
         self.DQN = tf.keras.models.load_model(folder_name + '/dqn.h5')
         self.target_dqn = tf.keras.models.load_model(folder_name + '/target_dqn.h5')
-        self.optimizer = self.DQN.optimizer
 
         # Load replay buffer
         if load_replay_buffer:
@@ -550,18 +561,24 @@ class Agent(object):
 
 # Create environment
 if __name__ == "__main__":
+    # create env
     game_wrapper = GameWrapper(ENV_NAME, MAX_NOOP_STEPS)
-    print("The environment has the following {} actions: {}".format(game_wrapper.env.action_space.n, game_wrapper.env.unwrapped.get_action_meanings()))
+    action_space = game_wrapper.env.action_space
+    action_means = game_wrapper.env.get_action_meanings()
+    print(action_space.n, ' actions: ', action_means)
 
     # TensorBoard writer
     writer = tf.summary.create_file_writer(TENSORBOARD_DIR)
 
     # Build main and target networks
-    MAIN_DQN = build_q_network(game_wrapper.env.action_space.n, LEARNING_RATE, input_shape=INPUT_SHAPE)
-    TARGET_DQN = build_q_network(game_wrapper.env.action_space.n, input_shape=INPUT_SHAPE)
+    main_dqn = build_q_network(action_space.n, LEARNING_RATE)
+    target_dqn = build_q_network(action_space.n)
 
-    replay_buffer = ReplayBuffer(size=MEM_SIZE, input_shape=INPUT_SHAPE, use_per=USE_PER)
-    agent = Agent(MAIN_DQN, TARGET_DQN, replay_buffer, game_wrapper.env.action_space.n, input_shape=INPUT_SHAPE, batch_size=BATCH_SIZE, use_per=USE_PER)
+    # replay buffer
+    replay_buffer = ReplayBuffer(size=MAX_REPLAY_BUFFER_SIZE, use_per=USE_PER)
+
+    # agent
+    agent = Agent(main_dqn, target_dqn, replay_buffer, action_space.n, batch_size=BATCH_SIZE, use_per=USE_PER)
 
     # Training and evaluation
     if LOAD_FROM is None:
@@ -582,7 +599,6 @@ if __name__ == "__main__":
         with writer.as_default():
             while frame_number < TOTAL_FRAMES:
                 # Training
-
                 epoch_frame = 0
                 while epoch_frame < FRAMES_BETWEEN_EVAL:
                     start_time = time.time()
@@ -601,13 +617,14 @@ if __name__ == "__main__":
 
                         # Add experience to replay memory
                         agent.add_experience(action=action,
-                                            frame=processed_frame[:, :, 0],
-                                            reward=reward, clip_reward=CLIP_REWARD,
-                                            terminal=life_lost)
+                                             frame=processed_frame[:, :, 0],
+                                             reward=reward, clip_reward=CLIP_REWARD,
+                                             terminal=life_lost)
 
                         # Update agent
                         if frame_number % UPDATE_FREQ == 0 and agent.replay_buffer.count > MIN_REPLAY_BUFFER_SIZE:
-                            loss, _ = agent.learn(BATCH_SIZE, gamma=DISCOUNT_FACTOR, frame_number=frame_number, priority_scale=PRIORITY_SCALE)
+                            loss, _ = agent.learn(BATCH_SIZE, gamma=DISCOUNT_FACTOR, frame_number=frame_number,
+                                                  priority_scale=PRIORITY_SCALE)
                             loss_list.append(loss)
 
                         # Update target network
@@ -629,7 +646,8 @@ if __name__ == "__main__":
                             tf.summary.scalar('Loss', np.mean(loss_list[-100:]), frame_number)
                             writer.flush()
 
-                        print(f'Game number: {str(len(rewards)).zfill(6)}  Frame number: {str(frame_number).zfill(8)}  Average reward: {np.mean(rewards[-10:]):0.1f}  Time taken: {(time.time() - start_time):.1f}s')
+                        print(
+                            f'Game number: {str(len(rewards)).zfill(6)}  Frame number: {str(frame_number).zfill(8)}  Average reward: {np.mean(rewards[-10:]):0.1f}  Time taken: {(time.time() - start_time):.1f}s')
 
                 # Evaluation every `FRAMES_BETWEEN_EVAL` frames
                 terminal = True
@@ -670,18 +688,21 @@ if __name__ == "__main__":
 
                 # Save model
                 if len(rewards) > 300 and SAVE_PATH is not None:
-                    agent.save(f'{SAVE_PATH}/save-{str(frame_number).zfill(8)}', frame_number=frame_number, rewards=rewards, loss_list=loss_list)
+                    agent.save(f'{SAVE_PATH}/save-{str(frame_number).zfill(8)}', frame_number=frame_number,
+                               rewards=rewards, loss_list=loss_list)
     except KeyboardInterrupt:
         print('\nTraining exited early.')
         writer.close()
 
         if SAVE_PATH is None:
             try:
-                SAVE_PATH = input('Would you like to save the trained model? If so, type in a save path, otherwise, interrupt with ctrl+c. ')
+                SAVE_PATH = input(
+                    'Would you like to save the trained model? If so, type in a save path, otherwise, interrupt with ctrl+c. ')
             except KeyboardInterrupt:
                 print('\nExiting...')
 
         if SAVE_PATH is not None:
             print('Saving...')
-            agent.save(f'{SAVE_PATH}/save-{str(frame_number).zfill(8)}', frame_number=frame_number, rewards=rewards, loss_list=loss_list)
+            agent.save(f'{SAVE_PATH}/save-{str(frame_number).zfill(8)}', frame_number=frame_number, rewards=rewards,
+                       loss_list=loss_list)
             print('Saved.')

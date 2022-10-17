@@ -8,7 +8,7 @@ import tensorflow as tf
 from config import (BATCH_SIZE, CLIP_REWARD, DISCOUNT_FACTOR, ENV_NAME,
                     EVAL_LENGTH, FRAMES_BETWEEN_EVAL, INPUT_SHAPE,
                     LEARNING_RATE, LOAD_FROM, MAX_EPISODE_LENGTH,
-                    MAX_NOOP_STEPS, MEM_SIZE, MIN_REPLAY_BUFFER_SIZE,
+                    MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE, MIN_REPLAY_BUFFER_SIZE,
                     PRIORITY_SCALE, SAVE_PATH, TOTAL_FRAMES, UPDATE_FREQ,
                     WRITE_TENSORBOARD)
 from DQN_CNN import Agent, GameWrapper, ReplayBuffer, build_q_network, process_frame
@@ -39,7 +39,7 @@ print("The environment has the following {} actions: {}".format(game_wrapper.env
 MAIN_DQN = build_q_network(game_wrapper.env.action_space.n, LEARNING_RATE, input_shape=INPUT_SHAPE)
 TARGET_DQN = build_q_network(game_wrapper.env.action_space.n, input_shape=INPUT_SHAPE)
 
-replay_buffer = ReplayBuffer(size=MEM_SIZE, input_shape=INPUT_SHAPE)
+replay_buffer = ReplayBuffer(size=MAX_REPLAY_BUFFER_SIZE, input_shape=INPUT_SHAPE)
 agent = Agent(MAIN_DQN, TARGET_DQN, replay_buffer, game_wrapper.env.action_space.n, input_shape=INPUT_SHAPE, batch_size=BATCH_SIZE)
 
 print('Loading model...')
