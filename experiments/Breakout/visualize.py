@@ -248,7 +248,7 @@ class VisWindow(pyglet.window.Window):
 
         self.values.append(value)
 
-        _, reward, self.terminal, self.life_lost, self.game_image = game_wrapper.step(action, render_mode='rgb_array')
+        _, reward, self.terminal, self.life_lost, self.game_image = game_wrapper.step(action)
         self.evaluate_frame_number += 1
         self.episode_reward_sum += reward
 

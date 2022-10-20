@@ -62,7 +62,7 @@ for frame in range(EVAL_LENGTH):
     action = 1 if life_lost else agent.get_action(0, game_wrapper.state, evaluation=True)
 
     # Step action
-    _, reward, terminal, life_lost = game_wrapper.step(action, render_mode='human')
+    _, reward, terminal, life_lost = game_wrapper.step(action)
 
     episode_reward_sum += reward
 
