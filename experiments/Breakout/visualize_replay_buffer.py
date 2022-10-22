@@ -2,17 +2,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from matplotlib.offsetbox import (AnnotationBbox, DrawingArea, OffsetImage,
-                                  TextArea)
+from matplotlib.offsetbox import (AnnotationBbox, OffsetImage)
 from sklearn.decomposition import PCA
 
-from config import (BATCH_SIZE, CLIP_REWARD, DISCOUNT_FACTOR, ENV_NAME,
-                    EVAL_LENGTH, FRAMES_BETWEEN_EVAL, INPUT_SHAPE,
-                    LEARNING_RATE, LOAD_FROM, MAX_EPISODE_LENGTH,
-                    MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE, MIN_REPLAY_BUFFER_SIZE,
-                    PRIORITY_SCALE, SAVE_PATH, TOTAL_FRAMES, UPDATE_FREQ,
-                    WRITE_TENSORBOARD)
-from DQN_CNN import Agent, GameWrapper, ReplayBuffer, build_q_network, process_frame
+from config import (ENV_NAME,
+                    INPUT_SHAPE,
+                    LEARNING_RATE, MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE)
+from DQN_CNN import Agent, GameWrapper, ReplayBuffer, build_q_network
 
 # This will usually fix any issues involving the GPU and cuDNN
 gpus = tf.config.experimental.list_physical_devices('GPU')

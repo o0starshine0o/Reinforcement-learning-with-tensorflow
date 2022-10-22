@@ -1,17 +1,10 @@
-import time
-
-import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 import tensorflow as tf
-from config import (BATCH_SIZE, CLIP_REWARD, DISCOUNT_FACTOR, ENV_NAME,
-                    EVAL_LENGTH, FRAMES_BETWEEN_EVAL, INPUT_SHAPE,
-                    LEARNING_RATE, LOAD_FROM, MAX_EPISODE_LENGTH,
-                    MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE, MIN_REPLAY_BUFFER_SIZE,
-                    PRIORITY_SCALE, SAVE_PATH, TOTAL_FRAMES, UPDATE_FREQ,
-                    WRITE_TENSORBOARD)
-from DQN_CNN import Agent, GameWrapper, ReplayBuffer, build_q_network, process_frame
+from config import (BATCH_SIZE, ENV_NAME,
+                    EVAL_LENGTH, INPUT_SHAPE,
+                    LEARNING_RATE, MAX_NOOP_STEPS, MAX_REPLAY_BUFFER_SIZE)
+from DQN_CNN import Agent, GameWrapper, ReplayBuffer, build_q_network
 
 # My installations require I run this to avoid errors with cuDNN.
 # You can remove it if your system doesn't require it.
