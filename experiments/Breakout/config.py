@@ -19,8 +19,11 @@ TENSORBOARD_DIR = 'tensorboard/'
 # Since Breakout is a simple game, I wouldn't recommend using it here.
 USE_PER = False
 
-PRIORITY_SCALE = 0.7              # How much the replay buffer should sample based on priorities. 0 = complete random samples, 1 = completely aligned with priorities
-CLIP_REWARD = True                # Any positive reward is +1, and negative reward is -1, 0 is unchanged
+# How much the replay buffer should sample based on priorities.
+# 0 = complete random samples, 1 = completely aligned with priorities
+PRIORITY_SCALE = 0.7
+# Any positive reward is +1, and negative reward is -1, 0 is unchanged
+CLIP_REWARD = True
 
 
 TOTAL_FRAMES = 30000000           # Total number of frames to train for

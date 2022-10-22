@@ -104,6 +104,7 @@ class GameWrapper:
         self.no_op_steps = no_op_steps
         self.history_length = history_length
 
+        # (84, 84, 4)
         self.state = None
         self.frame = None
         self.last_lives = 0
@@ -160,6 +161,7 @@ class GameWrapper:
         # 抽取最后n-1帧, 再添加1帧, 保证self.state的shape永远是(84, 84, 4)
         self.state = np.append(self.state[:, :, 1:], processed_frame, axis=2)
 
+        # (84, 84, 1)
         return processed_frame, reward, terminal, life_lost
 
 
@@ -195,9 +197,9 @@ class ReplayBuffer:
         """Saves a transition to the replay buffer
         Arguments:
             action: An integer between 0 and env.action_space.n - 1 
-                determining the action the agent perfomed
+                determining the action the agent performed
             frame: A (84, 84) frame of the game in grayscale
-            reward: A float determining the reward the agend received for performing an action
+            reward: A float determining the reward the agent received for performing an action
             terminal: A bool stating whether the episode terminated
         """
         if frame.shape != self.input_shape:
@@ -249,14 +251,19 @@ class ReplayBuffer:
 
                 # We check that all frames are from same episode with the two following if statements.
                 # If either are True, the index is invalid.
-                if index >= self.current and index - self.history_length <= self.current:
+                # current是插入的分界线, 如果选到了分界线后面4个,无法构成连续的状态,需要跳过
+                if index >= self.current >= index - self.history_length:
                     continue
+                # 终止标识也是一样, 无法构成连续的状态,跳过
                 if self.terminal_flags[index - self.history_length:index].any():
                     continue
+
+                # 跳出寻找index的过程, 表明选择的index是可以被接受的
                 break
             indices.append(index)
 
         # Retrieve states from memory
+        # 取出用于训练的state和对应的下一帧
         states = []
         new_states = []
         for idx in indices:
@@ -264,6 +271,7 @@ class ReplayBuffer:
             new_states.append(self.frames[idx - self.history_length + 1:idx + 1, ...])
 
         # (4, 84, 84) -> (batch_size, 4, 84, 84) -> (batch_size, 84, 84, 4)
+        # 转成需要的形状
         states = np.transpose(np.asarray(states), axes=(0, 2, 3, 1))
         new_states = np.transpose(np.asarray(new_states), axes=(0, 2, 3, 1))
 
@@ -334,12 +342,14 @@ class Agent(object):
             input_shape: Tuple/list describing the shape of the pre-processed environment
             batch_size: Number of samples to draw from the replay memory every updating session
             history_length: Number of historical frames available to the agent
-            eps_initial: Initial epsilon value.
+            eps_initial: Initial epsilon value. e-greedy, 探索概率
             eps_final: The "half-way" epsilon value.  The epsilon value decreases more slowly after this
             eps_final_frame: The final epsilon value
             eps_evaluation: The epsilon value used during evaluation
-            eps_annealing_frames: Number of frames during which epsilon will be annealed to eps_final, then eps_final_frame
-            replay_buffer_start_size: Size of replay buffer before beginning to learn (after this many frames, epsilon is decreased more slowly)
+            eps_annealing_frames: Number of frames during which epsilon will be annealed(退火)
+                to eps_final, then eps_final_frame
+            replay_buffer_start_size: Size of replay buffer before beginning to learn
+                (after this many frames, epsilon is decreased more slowly)
             max_frames: Number of total frames the agent will be trained for
             use_per: Use PER instead of classic experience replay
         """
@@ -368,7 +378,7 @@ class Agent(object):
         self.slope = -(self.eps_initial - self.eps_final) / self.eps_annealing_frames
         self.intercept = self.eps_initial - self.slope * self.replay_buffer_start_size
         self.slope_2 = -(self.eps_final - self.eps_final_frame) / (
-                    self.max_frames - self.eps_annealing_frames - self.replay_buffer_start_size)
+                self.max_frames - self.eps_annealing_frames - self.replay_buffer_start_size)
         self.intercept_2 = self.eps_final_frame - self.slope_2 * self.max_frames
 
         # DQN
@@ -475,29 +485,47 @@ class Agent(object):
                                                                                       priority_scale=priority_scale)
             importance = importance ** (1 - self.calc_epsilon(frame_number))
         else:
+            # states: (32, 84, 84, 4), actions: 32, rewards: 32, new_states: (32, 84, 84, 4), terminal_flags: 32
             states, actions, rewards, new_states, terminal_flags = self.replay_buffer.get_mini_batch(
                 batch_size=self.batch_size, priority_scale=priority_scale)
 
-        # Main DQN estimates best action in new states
-        # 32个new_state放到dqn中进行预测, 得到32个动作的概率, (32, 4), 再选取每个state对应action的最大概率(list, 32个int的list)
+        # Main DQN estimates(估计) best action in new states
+        # new_state(32, 84, 84, 4)放到dqn中进行预测, 得到32个动作的价值(32, 4),
+        # 再选取每个state对应action的最大价值的动作的**索引**, shape(32)
+        # ** Double DQN最大的不同:用DQN网络来选取new_state下最优action的索引(用当前的Q网络来选择动作) **
         arg_q_max = self.DQN.predict(new_states).argmax(axis=1)
 
         # Target DQN estimates q-vals for new states
         # (32, 4)
         future_q_vals = self.target_dqn.predict(new_states)
+        # DQN网络选取的动作,到target网络中的动作的**价值**, shape(32)
+        # ** Double DQN最大的不同:用target网络根据DQN网络选择的action,计算动作价值 **
         double_q = future_q_vals[range(batch_size), arg_q_max]
 
         # Calculate targets (bellman equation)
+        # Double-DQN算法:
+        # 1, 从dqn网络中选取action(argmax)
+        # 2, 把action放入target网络中,计算Q值, shape: (32)
         target_q = rewards + (gamma * double_q * (1 - terminal_flags))
 
         # Use targets to calculate loss (and use loss to calculate gradients)
         with tf.GradientTape() as tape:
+            # states: (32, 84, 84, 4), q_values: (32, 4)
+            # 这里是调用call方法, 结果约等同于predict(), 返回是tensor, predict()返回类型是ndarray
+            # 这是DQN的预测值
             q_values = self.DQN(states)
 
-            one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions,
-                                                            dtype=np.float32)  # using tf.one_hot causes strange errors
+            # 因为当时选择动作时, 是有随机选择的情况在里面的, 所以这里不能简单的用argmax来设置Q
+            # using tf.one_hot causes strange errors
+            # actions: (32), one_hot_actions: (32, 4)
+            # 只有对应的action才为1, 其余位置都为0
+            one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions, dtype=np.float32)
+            # multiply: (32, 4), 只保留选取动作的action概率, action的概率皆为0
+            # Q:(32), 只保留选取动作的action概率
             Q = tf.reduce_sum(tf.multiply(q_values, one_hot_actions), axis=1)
 
+            # shape: (32)
+            # 公式中应该是target_q-Q, 后面要用到平方或者绝对值, 所以这里没啥区别
             error = Q - target_q
             loss = tf.keras.losses.Huber()(target_q, Q)
 
@@ -507,7 +535,9 @@ class Agent(object):
                 # more frequently.
                 loss = tf.reduce_mean(loss * importance)
 
+        # 计算梯度
         model_gradients = tape.gradient(loss, self.DQN.trainable_variables)
+        # 反向传播, 更新dqn的参数
         self.DQN.optimizer.apply_gradients(zip(model_gradients, self.DQN.trainable_variables))
 
         if self.use_per:
@@ -571,6 +601,14 @@ class Agent(object):
 
 
 # Create environment
+def get_save_path():
+    try:
+        return input('Would you like to save the trained model? If so, type in a save path, '
+                     'otherwise, interrupt with ctrl+c. ')
+    except KeyboardInterrupt:
+        print('\nExiting...')
+
+
 if __name__ == "__main__":
     # create env
     game_wrapper = GameWrapper(ENV_NAME, MAX_NOOP_STEPS)
@@ -591,7 +629,7 @@ if __name__ == "__main__":
     # agent
     agent = Agent(main_dqn, target_dqn, replay_buffer, action_space.n, batch_size=BATCH_SIZE, use_per=USE_PER)
 
-    # Training and evaluation
+    # Training and evaluation, 断点学习
     if LOAD_FROM is None:
         frame_number = 0
         rewards = []
@@ -634,12 +672,14 @@ if __name__ == "__main__":
                                              terminal=life_lost)
 
                         # Update agent
+                        # 每操作4步,DQN执行一次梯度下降
                         if frame_number % UPDATE_FREQ == 0 and agent.replay_buffer.count > MIN_REPLAY_BUFFER_SIZE:
-                            loss, _ = agent.learn(BATCH_SIZE, gamma=DISCOUNT_FACTOR, frame_number=frame_number,
-                                                  priority_scale=PRIORITY_SCALE)
+                            loss, error = agent.learn(BATCH_SIZE, gamma=DISCOUNT_FACTOR, frame_number=frame_number,
+                                                      priority_scale=PRIORITY_SCALE)
                             loss_list.append(loss)
 
                         # Update target network
+                        # 把DQN的所有参数赋给target
                         if frame_number % UPDATE_FREQ == 0 and frame_number > MIN_REPLAY_BUFFER_SIZE:
                             agent.update_target_network()
 
@@ -659,7 +699,10 @@ if __name__ == "__main__":
                             writer.flush()
 
                         print(
-                            f'Game number: {str(len(rewards)).zfill(6)}  Frame number: {str(frame_number).zfill(8)}  Average reward: {np.mean(rewards[-10:]):0.1f}  Time taken: {(time.time() - start_time):.1f}s')
+                            f'Game number: {str(len(rewards)).zfill(6)}  '
+                            f'Frame number: {str(frame_number).zfill(8)}  '
+                            f'Average reward: {np.mean(rewards[-10:]):0.1f}  '
+                            f'Time taken: {(time.time() - start_time):.1f} s')
 
                 # Evaluation every `FRAMES_BETWEEN_EVAL` frames
                 terminal = True
@@ -679,7 +722,7 @@ if __name__ == "__main__":
                     action = 1 if life_lost else agent.get_action(frame_number, game_wrapper.state, evaluation=True)
 
                     # Step action
-                    _, reward, terminal, life_lost = game_wrapper.step(action)
+                    processed_frame, reward, terminal, life_lost = game_wrapper.step(action)
                     evaluate_frame_number += 1
                     episode_reward_sum += reward
 
@@ -707,14 +750,8 @@ if __name__ == "__main__":
         writer.close()
 
         if SAVE_PATH is None:
-            try:
-                SAVE_PATH = input(
-                    'Would you like to save the trained model? If so, type in a save path, otherwise, interrupt with ctrl+c. ')
-            except KeyboardInterrupt:
-                print('\nExiting...')
+            SAVE_PATH = get_save_path()
 
         if SAVE_PATH is not None:
-            print('Saving...')
             agent.save(f'{SAVE_PATH}/save-{str(frame_number).zfill(8)}', frame_number=frame_number, rewards=rewards,
                        loss_list=loss_list)
-            print('Saved.')
