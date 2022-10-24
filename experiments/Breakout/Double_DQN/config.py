@@ -44,7 +44,7 @@ TRAIN_FRAMES_BETWEEN_EVALUATION = 100000  # Number of frames between evaluations
 LEARNING_RATE = 0.00001
 DISCOUNT_FACTOR = 0.99  # Gamma, how much to discount future rewards
 UPDATE_DQN_FRAMES = 4  # Number of actions between gradient descent steps
-UPDATE_TARGET_FRAMES = 10000  # Number of actions chosen between updating the target network
+UPDATE_TARGET_FRAMES = 4  # Number of actions chosen between updating the target network
 
 # 评估
 EVAL_FRAMES = 10000  # Number of frames to evaluate for, 每次评估需要产生的帧数

@@ -128,6 +128,13 @@ def action_step(frame_number: int, is_train=True):
 
 
 def train(frame_number: int, rewards: list, loss_list: list):
+    """Evaluation every `FRAMES_BETWEEN_EVAL` frames
+
+    Arguments:
+        frame_number: Number of current number
+        rewards: 收益列表
+        loss_list: 损失列表
+    """
     epoch_frame = 0
     start_time = time.time()
     while epoch_frame < TRAIN_FRAMES_BETWEEN_EVALUATION:
@@ -167,7 +174,11 @@ def train(frame_number: int, rewards: list, loss_list: list):
 
 
 def evaluation(frame_number: int):
-    # Evaluation every `FRAMES_BETWEEN_EVAL` frames
+    """Evaluation every `FRAMES_BETWEEN_EVAL` frames
+
+    Arguments:
+        frame_number: Number of current number
+    """
     terminal = True
     eval_rewards = []
     episode_reward_sum = 0
@@ -231,6 +242,8 @@ def run():
                 # Save model
                 if len(rewards) > 300:
                     save_model(frame_number, rewards=rewards, loss_list=loss_list)
+            # 最后了还是需要保存下模型的
+            save_model(frame_number, rewards=rewards, loss_list=loss_list)
 
     except KeyboardInterrupt:
         print('\nTraining exited early.')

@@ -165,7 +165,7 @@ class Agent(object):
     def learn(self, frame_number, batch_size=BATCH_SIZE, gamma=DISCOUNT_FACTOR, priority_scale=PRIORITY_SCALE):
         """Sample a batch and use it to improve the DQN
         Arguments:
-            frame_number: Global frame number (used for calculating importances)
+            frame_number: Global frame number (used for calculating importance)
             batch_size: How many samples to draw for an update
             gamma: Reward discount
             priority_scale: How much to weight priorities when sampling the replay buffer.
@@ -173,7 +173,6 @@ class Agent(object):
         Returns:
             The loss between the predicted and target Q as a float
         """
-
         if self.use_per:
             (states, actions, rewards, new_states,
              terminal_flags), importance, indices = self.replay_buffer.get_mini_batch(batch_size=self.batch_size,
@@ -188,20 +187,20 @@ class Agent(object):
         # new_state(32, 84, 84, 4)放到dqn中进行预测, 得到32个动作的价值(32, 4),
         # 再选取每个state对应action的最大价值的动作的**索引**, shape(32)
         # ** Double DQN最大的不同:用DQN网络来选取new_state下最优action的索引(用当前的Q网络来选择动作) **
-        arg_q_max = self.DQN.predict(new_states).argmax(axis=1)
+        action_taken = self.DQN.predict(new_states).argmax(axis=1)
 
-        # Target DQN estimates q-vals for new states
+        # Target DQN estimates q-values for new states
         # (32, 4)
-        future_q_vals = self.target_dqn.predict(new_states)
+        new_actions = self.target_dqn.predict(new_states)
         # DQN网络选取的动作,到target网络中的动作的**价值**, shape(32)
         # ** Double DQN最大的不同:用target网络根据DQN网络选择的action,计算动作价值 **
-        double_q = future_q_vals[range(batch_size), arg_q_max]
+        action_values = new_actions[range(batch_size), action_taken]
 
         # Calculate targets (bellman equation)
         # Double-DQN算法:
         # 1, 从dqn网络中选取action(argmax)
         # 2, 把action放入target网络中,计算Q值, shape: (32)
-        target_q = rewards + (gamma * double_q * (1 - terminal_flags))
+        target_q = rewards + (gamma * action_values * (1 - terminal_flags))
 
         # Use targets to calculate loss (and use loss to calculate gradients)
         with tf.GradientTape() as tape:
@@ -216,13 +215,13 @@ class Agent(object):
             # 只有对应的action才为1, 其余位置都为0
             one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions, dtype=np.float32)
             # multiply: (32, 4), 只保留选取动作的action概率, action的概率皆为0
-            # Q:(32), 只保留选取动作的action概率
-            Q = tf.reduce_sum(tf.multiply(q_values, one_hot_actions), axis=1)
+            # q:(32), 只保留选取动作的action价值
+            q = tf.reduce_sum(tf.multiply(q_values, one_hot_actions), axis=1)
 
             # shape: (32)
             # 公式中应该是target_q-Q, 后面要用到平方或者绝对值, 所以这里没啥区别
-            error = Q - target_q
-            loss = tf.keras.losses.Huber()(target_q, Q)
+            error = q - target_q
+            loss = tf.keras.losses.Huber()(target_q, q)
 
             if self.use_per:
                 # Multiply the loss by importance, so that the gradient is also scaled.
