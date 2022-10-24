@@ -194,13 +194,13 @@ class Agent(object):
         new_actions = self.target_dqn.predict(new_states)
         # DQN网络选取的动作,到target网络中的动作的**价值**, shape(32)
         # ** Double DQN最大的不同:用target网络根据DQN网络选择的action,计算动作价值 **
-        action_values = new_actions[range(batch_size), action_taken]
+        new_action_values = new_actions[range(batch_size), action_taken]
 
         # Calculate targets (bellman equation)
         # Double-DQN算法:
         # 1, 从dqn网络中选取action(argmax)
         # 2, 把action放入target网络中,计算Q值, shape: (32)
-        target_q = rewards + (gamma * action_values * (1 - terminal_flags))
+        target_q = rewards + (gamma * new_action_values * (1 - terminal_flags))
 
         # Use targets to calculate loss (and use loss to calculate gradients)
         with tf.GradientTape() as tape:

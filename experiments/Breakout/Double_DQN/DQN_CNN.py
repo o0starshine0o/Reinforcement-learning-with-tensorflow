@@ -21,7 +21,7 @@ def init_env():
     return game_wrapper, action_space.n
 
 
-def build_q_network(action_count: int, learning_rate=0.00001, input_shape=INPUT_SHAPE, history_length=4):
+def build_q_network(action_count: int, learning_rate=LEARNING_RATE, input_shape=INPUT_SHAPE, history_length=4):
     """Builds a dueling DQN as a Keras model
     Arguments:
         action_count: Number of possible action the agent can take
@@ -33,30 +33,31 @@ def build_q_network(action_count: int, learning_rate=0.00001, input_shape=INPUT_
     """
     # (None, 84, 84, 4)
     model_input = Input((input_shape[0], input_shape[1], history_length))
+    # normalize by 255
     # (None, 84, 84, 4)
-    x = Lambda(lambda layer: layer / 255)(model_input)  # normalize by 255
+    x = Lambda(lambda layer: layer / 255)(model_input)
 
-    # (None, 20, 20, 32)
-    x = Conv2D(32, 8, 4, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
-    # (None, 9, 9, 64)
+    # (None, 12, 12, 32), 12 = (84 + 2 * 0 - 12) / 6 + 1
+    x = Conv2D(32, 12, 6, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
+    # (None, 5, 5, 64), 5 = (12 + 2 * 0 - 4) / 2 + 1
     x = Conv2D(64, 4, 2, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
-    # (None, 7, 7, 64)
-    x = Conv2D(64, 3, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
-    # (None, 1, 1, 1024)
-    x = Conv2D(1024, 7, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
+    # (None, 1, 1, 128), 1 = (5 + 2 * 0 - 5) / 1 + 1
+    x = Conv2D(128, 5, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
 
-    # Split into value(None, 1, 1, 512) and advantage(None, 1, 1, 512) streams
-    val_stream, adv_stream = Lambda(lambda w: tf.split(w, 2, 3))(x)  # custom splitting layer
+    # Split into value(None, 1, 1, 64) and advantage(None, 1, 1, 64) streams
+    # custom splitting layer
+    # 这是duelling-DQN的架构
+    value_stream, advantage_stream = Lambda(lambda w: tf.split(w, 2, 3))(x)
 
-    # (None, 512)
-    val_stream = Flatten()(val_stream)
+    # (None, 64)
+    value_stream = Flatten()(value_stream)
     # (None, 1)
-    val = Dense(1, kernel_initializer=VarianceScaling(scale=2.))(val_stream)
+    value = Dense(1, kernel_initializer=VarianceScaling(scale=2.))(value_stream)
 
-    # (None, 512)
-    adv_stream = Flatten()(adv_stream)
+    # (None, 128)
+    advantage_stream = Flatten()(advantage_stream)
     # (None, n_actions=4)
-    adv = Dense(action_count, kernel_initializer=VarianceScaling(scale=2.))(adv_stream)
+    advantage = Dense(action_count, kernel_initializer=VarianceScaling(scale=2.))(advantage_stream)
 
     # Combine streams into Q-Values
     reduce_mean = Lambda(lambda w: tf.reduce_mean(w, axis=1, keepdims=True))  # custom layer for reduce mean
@@ -64,7 +65,8 @@ def build_q_network(action_count: int, learning_rate=0.00001, input_shape=INPUT_
     # reduce_mean(adv):(None, 1)
     # Subtract()([adv, reduce_mean(adv)]): (None, 4)
     # (None, 4)
-    q_values = Add()([val, Subtract()([adv, reduce_mean(adv)])])
+    # duelling-DQN的Q值计算: a_value = value + (advantage - mean(advantage))
+    q_values = Add()([value, Subtract()([advantage, reduce_mean(advantage)])])
 
     # Build model
     model = Model(model_input, q_values)
@@ -237,8 +239,9 @@ def run():
             while frame_number < TOTAL_FRAMES:
                 # Training
                 frame_number = train(frame_number, rewards, loss_list)
-                # Evaluation
-                evaluation(frame_number)
+                # Evaluation, 经验池都没有填到位的话,没必要评价
+                if frame_number > MIN_REPLAY_BUFFER_SIZE:
+                    evaluation(frame_number)
                 # Save model
                 if len(rewards) > 300:
                     save_model(frame_number, rewards=rewards, loss_list=loss_list)
