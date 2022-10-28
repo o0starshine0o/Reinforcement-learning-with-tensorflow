@@ -38,11 +38,13 @@ def build_q_network(action_count: int, learning_rate=LEARNING_RATE, input_shape=
     x = Lambda(lambda layer: layer / 255)(model_input)
 
     # (None, 12, 12, 32), 12 = (84 + 2 * 0 - 12) / 6 + 1
-    x = Conv2D(32, 12, 6, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
+    x = Conv2D(32, 8, 4, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
     # (None, 5, 5, 64), 5 = (12 + 2 * 0 - 4) / 2 + 1
     x = Conv2D(64, 4, 2, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
+    # (None, 5, 5, 64), 5 = (12 + 2 * 0 - 4) / 2 + 1
+    x = Conv2D(64, 3, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
     # (None, 1, 1, 128), 1 = (5 + 2 * 0 - 5) / 1 + 1
-    x = Conv2D(128, 5, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
+    x = Conv2D(1024, 7, 1, kernel_initializer=VarianceScaling(scale=2.), activation='relu', use_bias=False)(x)
 
     # Split into value(None, 1, 1, 64) and advantage(None, 1, 1, 64) streams
     # custom splitting layer
@@ -264,5 +266,6 @@ if __name__ == "__main__":
 
     # TensorBoard writer
     writer = tf.summary.create_file_writer(TENSORBOARD_DIR)
+    tf.summary.trace_on()
 
     run()

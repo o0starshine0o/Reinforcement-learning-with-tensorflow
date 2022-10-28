@@ -122,7 +122,7 @@ class Agent(object):
         state = state.reshape((-1, self.input_shape[0], self.input_shape[1], self.history_length))
         # DQN返回的是(1, 4)形式,第二维数组代表了每个动作的执行概率
         # 因为只需要预测一次,这里使用call方法比predict方法快10倍
-        action_probabilities = self.DQN(state).numpy()[0]
+        action_probabilities = self.DQN.predict(state)[0]
         # 返回概率最大的那个动作索引
         return action_probabilities.argmax()
 
