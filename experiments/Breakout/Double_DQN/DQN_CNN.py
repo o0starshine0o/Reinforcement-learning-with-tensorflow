@@ -16,9 +16,9 @@ from replay_buffer import ReplayBuffer
 def init_env():
     game_wrapper = GameWrapper(ENV_NAME, MAX_NOOP_STEPS)
     action_space = game_wrapper.env.action_space
-    action_means = game_wrapper.env.get_action_meanings()
-    print(action_space.n, ' actions: ', action_means)
-    return game_wrapper, action_space.n
+    means = game_wrapper.env.get_action_meanings()
+    print(action_space.n, ' actions: ', means)
+    return game_wrapper, action_space.n, means
 
 
 def build_q_network(action_count: int, learning_rate=LEARNING_RATE, input_shape=INPUT_SHAPE, history_length=4):
@@ -119,6 +119,12 @@ def action_step(frame_number: int, is_train=True, life_lost=False):
 
     # Take step
     processed_frame, reward, terminal, life_lost = game.step(action)
+
+    if reward > 0:
+        with writer.as_default():
+            image = processed_frame.reshape((-1, *processed_frame.shape))
+            tf.summary.image("reward frame", image, frame_number, description=action_means[action])
+            writer.flush()
 
     # Add experience to replay memory
     if is_train:
@@ -279,7 +285,7 @@ if __name__ == "__main__":
     tf.summary.trace_on()
 
     # 游戏环境
-    game, n_actions = init_env()
+    game, n_actions, action_means = init_env()
 
     # agent
     agent = init_agent(n_actions)
