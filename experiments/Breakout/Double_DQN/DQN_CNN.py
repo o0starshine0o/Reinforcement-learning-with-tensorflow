@@ -77,9 +77,16 @@ def build_q_network(action_count: int, learning_rate=LEARNING_RATE, input_shape=
     return model
 
 
+@tf.function
+def get_model(dqn: Model):
+    _input = np.full(shape=(1, 84, 84, 4), fill_value=2, dtype='float32')
+    return dqn(_input)
+
+
 def init_agent(action_count: int):
     # Build main and target networks
     main_dqn = build_q_network(action_count, LEARNING_RATE)
+    _input = get_model(main_dqn)
     target_dqn = build_q_network(action_count)
 
     # replay buffer
@@ -233,6 +240,9 @@ def save_model(frame_number: int, save_path=SAVE_PATH, support_keyboard_input=Fa
 
 
 def run():
+    # 绘制计算图
+    is_graph = False
+
     # meta data
     frame_number, rewards, loss_list = init_meta()
 
@@ -245,6 +255,11 @@ def run():
                 # Evaluation, 经验池都没有填到位的话,没必要评价
                 if frame_number > MIN_REPLAY_BUFFER_SIZE:
                     evaluation(frame_number)
+                # 展示计算图
+                if not is_graph:
+                    is_graph = True
+                    print('draw graph done')
+                    tf.summary.trace_export('train_func', step=0)
                 # Save model
                 if len(rewards) > 300:
                     save_model(frame_number, rewards=rewards, loss_list=loss_list)
@@ -259,14 +274,14 @@ def run():
 
 
 if __name__ == "__main__":
+    # TensorBoard writer
+    writer = tf.summary.create_file_writer(TENSORBOARD_DIR)
+    tf.summary.trace_on()
+
     # 游戏环境
     game, n_actions = init_env()
 
     # agent
     agent = init_agent(n_actions)
-
-    # TensorBoard writer
-    writer = tf.summary.create_file_writer(TENSORBOARD_DIR)
-    tf.summary.trace_on()
 
     run()
