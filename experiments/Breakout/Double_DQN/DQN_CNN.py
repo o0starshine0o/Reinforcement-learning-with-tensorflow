@@ -101,14 +101,14 @@ def init_meta(load_from=LOAD_FROM, is_load_replay_buffer=LOAD_REPLAY_BUFFER):
         return meta['frame_number'], meta['rewards'], meta['loss_list']
 
 
-def action_step(frame_number: int, is_train=True):
+def action_step(frame_number: int, is_train=True, life_lost=False):
     loss = None
-    life_lost = False
 
     # Get action
     # Breakout requires a "fire" action (action #1) to start the game each time a life is lost.
     # Otherwise, the agent would sit around doing nothing.
-    action = 1 if not is_train and life_lost else agent.get_action(frame_number, game.state, not is_train)
+    # 训练的时候让模型自己去学会这个,评估的时候人工干预
+    action = ACTION_FIRE if not is_train and life_lost else agent.get_action(frame_number, game.state, not is_train)
 
     # Take step
     processed_frame, reward, terminal, life_lost = game.step(action)
@@ -128,7 +128,7 @@ def action_step(frame_number: int, is_train=True):
     if is_train and frame_number % UPDATE_TARGET_FRAMES == 0 and frame_number > MIN_REPLAY_BUFFER_SIZE:
         agent.update_target_network()
 
-    return reward, terminal, loss
+    return reward, terminal, life_lost, loss
 
 
 def train(frame_number: int, rewards: list, loss_list: list):
@@ -147,7 +147,7 @@ def train(frame_number: int, rewards: list, loss_list: list):
         game.reset()
         reward_sum = 0
         for _ in range(MAX_TRAIN_EPISODE_FRAMES):
-            reward, terminal, loss = action_step(frame_number)
+            reward, terminal, life_lost, loss = action_step(frame_number)
             frame_number += 1
             epoch_frame += 1
             reward_sum += reward
@@ -184,6 +184,7 @@ def evaluation(frame_number: int):
         frame_number: Number of current number
     """
     terminal = True
+    life_lost = False
     eval_rewards = []
     episode_reward_sum = 0
     start_time = time.time()
@@ -193,7 +194,7 @@ def evaluation(frame_number: int):
             game.reset(evaluation=True)
             episode_reward_sum = 0
 
-        reward, terminal, _ = action_step(frame_number, is_train=False)
+        reward, terminal, life_lost, loss = action_step(frame_number, is_train=False, life_lost=life_lost)
 
         episode_reward_sum += reward
 
@@ -201,7 +202,7 @@ def evaluation(frame_number: int):
         if terminal:
             eval_rewards.append(episode_reward_sum)
 
-    # 得分为每场的均值, 如果只有一场, 就是用本场的得分
+    # 得分为每场的均值, 如果只有一场(可能还没结束), 就是用本场的得分
     evaluation_score = np.mean(eval_rewards) if len(eval_rewards) > 0 else episode_reward_sum
 
     # Print score and write to tensorboard

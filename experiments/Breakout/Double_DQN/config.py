@@ -51,3 +51,6 @@ UPDATE_TARGET_FRAMES = 4  # Number of actions chosen between updating the target
 
 # 评估
 EVAL_FRAMES = 10000  # Number of frames to evaluate for, 每次评估需要产生的帧数
+
+# 行动
+ACTION_FIRE = 1
