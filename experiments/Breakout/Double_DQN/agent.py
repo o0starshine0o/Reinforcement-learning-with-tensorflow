@@ -187,6 +187,9 @@ class Agent(object):
         # new_state(32, 84, 84, 4)放到dqn中进行预测, 得到32个动作的价值(32, 4),
         # 再选取每个state对应action的最大价值的动作的**索引**, shape(32)
         # ** Double DQN最大的不同:用DQN网络来选取new_state下最优action的索引(用当前的Q网络来选择动作) **
+        # max_a(S1, a), 在S1状态下, 选取action值最高的那个action
+        # predict()输出了每个动作的价值
+        # argmax()选取价值最大的那个动作
         action_taken = self.DQN.predict(new_states).argmax(axis=1)
 
         # Target DQN estimates q-values for new states
@@ -207,6 +210,7 @@ class Agent(object):
             # states: (32, 84, 84, 4), q_values: (32, 4)
             # 这里是调用call方法, 结果约等同于predict(), 返回是tensor, predict()返回类型是ndarray
             # 这是DQN的预测值
+            # 每一个动作的价值
             q_values = self.DQN(states)
 
             # 因为当时选择动作时, 是有随机选择的情况在里面的, 所以这里不能简单的用argmax来设置Q
@@ -216,11 +220,15 @@ class Agent(object):
             one_hot_actions = tf.keras.utils.to_categorical(actions, self.n_actions, dtype=np.float32)
             # multiply: (32, 4), 只保留选取动作的action概率, action的概率皆为0
             # q:(32), 只保留选取动作的action价值
+            # 照理说,这个可以直接存放到内存中去, 不需要再次计算
             q = tf.reduce_sum(tf.multiply(q_values, one_hot_actions), axis=1)
 
             # shape: (32)
             # 公式中应该是target_q-Q, 后面要用到平方或者绝对值, 所以这里没啥区别
             error = q - target_q
+            # 式子中delta是一个边界，用于判断是否为较为奇异的数据点，
+            # 当在这个边界内的数据默认使用MSE Loss，大于这个边界的数据将Loss减小，使用线性函数。
+            # 这种方法能降低奇异数据点对于Loss计算的权重，避免模型过拟合。
             loss = tf.keras.losses.Huber()(target_q, q)
 
             if self.use_per:
